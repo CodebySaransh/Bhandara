@@ -1,0 +1,405 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: bhandaras
+    description: Public Bhandara discovery and submissions
+  - name: community
+    description: Favorites and reports
+  - name: admin
+    description: Verification and moderation
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /bhandaras:
+    get:
+      operationId: listBhandaras
+      tags: [bhandaras]
+      summary: List public Bhandaras
+      parameters:
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/CityQuery"
+        - $ref: "#/components/parameters/LocalityQuery"
+        - name: dateFilter
+          in: query
+          schema:
+            type: string
+            enum: [all, today, tomorrow, week, custom]
+            default: all
+        - name: date
+          in: query
+          schema:
+            type: ["string", "null"]
+            format: date
+        - name: maxDistanceKm
+          in: query
+          schema:
+            type: ["number", "null"]
+            minimum: 1
+            maximum: 200
+        - name: latitude
+          in: query
+          schema:
+            type: ["number", "null"]
+            minimum: -90
+            maximum: 90
+        - name: longitude
+          in: query
+          schema:
+            type: ["number", "null"]
+            minimum: -180
+            maximum: 180
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [soonest, nearest]
+            default: soonest
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Public, non-expired Bhandaras
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BhandaraListResponse"
+    post:
+      operationId: submitBhandara
+      tags: [bhandaras]
+      summary: Submit a Bhandara for review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BhandaraInput"
+      responses:
+        "201":
+          description: Submission accepted for verification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bhandara"
+  /bhandaras/{id}:
+    get:
+      operationId: getBhandara
+      tags: [bhandaras]
+      summary: Get a public Bhandara
+      parameters:
+        - $ref: "#/components/parameters/BhandaraId"
+      responses:
+        "200":
+          description: Bhandara detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bhandara"
+        "404":
+          description: Bhandara not found
+    patch:
+      operationId: updateBhandara
+      tags: [bhandaras]
+      summary: Update a submitted Bhandara
+      parameters:
+        - $ref: "#/components/parameters/BhandaraId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BhandaraUpdate"
+      responses:
+        "200":
+          description: Updated Bhandara
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bhandara"
+  /bhandaras/{id}/favorite:
+    post:
+      operationId: favoriteBhandara
+      tags: [community]
+      summary: Save a Bhandara for a device or signed-in user
+      parameters:
+        - $ref: "#/components/parameters/BhandaraId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FavoriteInput"
+      responses:
+        "200":
+          description: Favorite state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavoriteResponse"
+    delete:
+      operationId: unfavoriteBhandara
+      tags: [community]
+      summary: Remove a saved Bhandara
+      parameters:
+        - $ref: "#/components/parameters/BhandaraId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FavoriteInput"
+      responses:
+        "200":
+          description: Favorite removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavoriteResponse"
+  /reports:
+    post:
+      operationId: reportBhandara
+      tags: [community]
+      summary: Report an incorrect, cancelled, or duplicate Bhandara
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportInput"
+      responses:
+        "201":
+          description: Report received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+  /admin/summary:
+    get:
+      operationId: getAdminSummary
+      tags: [admin]
+      summary: Get moderation summary
+      responses:
+        "200":
+          description: Moderation summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSummary"
+  /admin/bhandaras:
+    get:
+      operationId: listAdminBhandaras
+      tags: [admin]
+      summary: List submissions for moderation
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, all]
+            default: pending
+        - $ref: "#/components/parameters/SearchQuery"
+      responses:
+        "200":
+          description: Moderation queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BhandaraListResponse"
+  /admin/bhandaras/{id}:
+    patch:
+      operationId: moderateBhandara
+      tags: [admin]
+      summary: Approve, edit, or reject a submission
+      parameters:
+        - $ref: "#/components/parameters/BhandaraId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationInput"
+      responses:
+        "200":
+          description: Moderated Bhandara
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bhandara"
+    delete:
+      operationId: deleteBhandara
+      tags: [admin]
+      summary: Delete a Bhandara
+      parameters:
+        - $ref: "#/components/parameters/BhandaraId"
+      responses:
+        "204":
+          description: Bhandara deleted
+components:
+  parameters:
+    BhandaraId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    SearchQuery:
+      name: q
+      in: query
+      schema:
+        type: string
+        maxLength: 120
+    CityQuery:
+      name: city
+      in: query
+      schema:
+        type: string
+        maxLength: 80
+    LocalityQuery:
+      name: locality
+      in: query
+      schema:
+        type: string
+        maxLength: 80
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Bhandara:
+      type: object
+      required: [id, name, temple, locality, city, address, startAt, endAt, prasad, latitude, longitude, verificationStatus, isFeatured, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        temple: { type: string }
+        description: { type: ["string", "null"] }
+        locality: { type: string }
+        city: { type: string }
+        address: { type: string }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        prasad: { type: string }
+        organizerName: { type: string }
+        organizerPhone: { type: ["string", "null"] }
+        latitude: { type: number }
+        longitude: { type: number }
+        distanceKm: { type: ["number", "null"] }
+        verificationStatus:
+          type: string
+          enum: [pending, approved, rejected]
+        verificationNote: { type: ["string", "null"] }
+        isFeatured: { type: boolean }
+        favoriteCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    BhandaraInput:
+      type: object
+      required: [name, temple, locality, city, address, startAt, endAt, prasad, organizerName, latitude, longitude]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 120 }
+        temple: { type: string, minLength: 2, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        locality: { type: string, minLength: 2, maxLength: 80 }
+        city: { type: string, minLength: 2, maxLength: 80 }
+        address: { type: string, minLength: 5, maxLength: 240 }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        prasad: { type: string, minLength: 2, maxLength: 120 }
+        organizerName: { type: string, minLength: 2, maxLength: 120 }
+        organizerPhone: { type: string, maxLength: 30 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+    BhandaraUpdate:
+      allOf:
+        - $ref: "#/components/schemas/BhandaraInput"
+    BhandaraListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Bhandara" }
+        total: { type: integer }
+    FavoriteInput:
+      type: object
+      required: [userKey]
+      properties:
+        userKey: { type: string, minLength: 1, maxLength: 160 }
+    FavoriteResponse:
+      type: object
+      required: [favorited, favoriteCount]
+      properties:
+        favorited: { type: boolean }
+        favoriteCount: { type: integer }
+    ReportInput:
+      type: object
+      required: [bhandaraId, reason]
+      properties:
+        bhandaraId: { type: integer }
+        reason:
+          type: string
+          enum: [incorrect, cancelled, duplicate, other]
+        note: { type: string, maxLength: 500 }
+        reporterKey: { type: string, maxLength: 160 }
+    Report:
+      type: object
+      required: [id, bhandaraId, reason, status, createdAt]
+      properties:
+        id: { type: integer }
+        bhandaraId: { type: integer }
+        reason: { type: string }
+        note: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [open, reviewed, dismissed]
+        createdAt: { type: string, format: date-time }
+    ModerationInput:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [approve, reject, edit]
+        verificationNote: { type: string, maxLength: 500 }
+        name: { type: string, maxLength: 120 }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        prasad: { type: string, maxLength: 120 }
+        address: { type: string, maxLength: 240 }
+    AdminSummary:
+      type: object
+      required: [pending, approvedToday, upcoming, reports]
+      properties:
+        pending: { type: integer }
+        approvedToday: { type: integer }
+        upcoming: { type: integer }
+        reports: { type: integer }
+
